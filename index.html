@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="repl">
+      <div class="form">
+        <input name="text" placeholder="enter text">
+        <br />
+        <label "Text Color"><input name="fg" type="color" value="#000000"> Foreground</label>
+        <br />
+        <label "Background Color"><input name="bg" type="color" value="#ffffff"> Background</label>
+        <br />
+        <label "Timeout"><input name="timeout" type="color" value="#ffffff"> Background</label>
+        <br />
+        <select class="screen">
+          <option value="" disabled selected>select screen</option>
+        </select>
+        <button class="go">go</button>
+      </div>
+    </div>
+
+    <script>
+      const searchParams = (new URL(window.location)).searchParams;
+      const select = document.querySelector('.screen');
+
+      select.addEventListener('change', (e) => {
+        defaultScreen = select.value;
+        localStorage.setItem('defaultscreen', defaultScreen);
+      });
+
+      const textInput = document.querySelector('input[name=text]');
+      const fgInput = document.querySelector('input[name=fg]');
+      const bgInput = document.querySelector('input[name=bg]');
+      let defaultScreen = localStorage.getItem('defaultscreen');
+      let server = searchParams.get('server') || localStorage.getItem('server');
+
+      async function sendText(text, fg=null, bg=null) {
+        if (text.substr(0,5).toLowerCase() === 'server ') {
+          text = text.trim().split(/\s+/);
+          if (text.length !== 2) {
+            error('format is "server http://example.com"');
+            return;
+          }
+          server = text[2];
+          localStorage.setItem('server', server);
+          getCensus(updateSelect);
+          return;
+        }
+
+        let textyURL = new URL('http://mythmon.github.io/texty/');
+        // can't use searchParams for this, because we need to dodge encoding
+        textyURL.search = `?text=${text}&fg=${fg}&bg=${bg}`;
+
+        await fetch(`${server}/api/content`, {
+          method: 'POST',
+          body: JSON.stringify({
+            url: textyURL.toString(),
+            screen: defaultScreen,
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+      }
+
+      async function getCensus() {
+        try {
+          let res = await fetch(`${server}/api/census.clients`, {method: 'POST'});
+          return res.json();
+        } catch (e) {
+          error('failed to get screen list from server: ' + server);
+          if (e) {
+            error(e);
+          }
+        }
+      }
+
+      async function updateSelect() {
+        const census = await getCensus();
+
+        while (select.childElementCount > 1) {
+          select.firstElementChild.remove();
+        }
+
+        const clients = census.clients;
+        clients.sort();
+        for (let client of clients) {
+          const option = document.createElement('option');
+          option.value = client;
+          option.innerHTML = client;
+          if (client === defaultScreen) {
+            option.setAttribute('selected', true);
+          }
+          select.appendChild(option);
+        }
+      }
+
+      updateSelect();
+      setInterval(updateSelect, 30 * 1000);
+
+      function submit() {
+        const text = textInput.value;
+        const fg = fgInput.value;
+        const bg = bgInput.value;
+        if (text.trim().length > 0) {
+          sendText(text, fg, bg);
+        }
+      }
+
+      document.querySelector('.go').addEventListener('click', submit);
+
+      input.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          submit();
+          e.preventDefault();
+        }
+      });
+
+      function error(text) {
+        console.error(text);
+      }
+    </script>
+  </body>
+</html>
