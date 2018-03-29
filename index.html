@@ -19,8 +19,6 @@
         <br />
         <label "Background Color"><input name="bg" type="color" value="#ffffff"> Background</label>
         <br />
-        <label "Timeout"><input name="timeout" type="color" value="#ffffff"> Background</label>
-        <br />
         <select class="screen">
           <option value="" disabled selected>select screen</option>
         </select>
@@ -44,15 +42,15 @@
       let server = searchParams.get('server') || localStorage.getItem('server');
 
       async function sendText(text, fg=null, bg=null) {
-        if (text.substr(0,5).toLowerCase() === 'server ') {
+        if (text.startsWith('server ')) {
           text = text.trim().split(/\s+/);
           if (text.length !== 2) {
             error('format is "server http://example.com"');
             return;
           }
-          server = text[2];
+          server = text[1];
           localStorage.setItem('server', server);
-          getCensus(updateSelect);
+          updateSelect();
           return;
         }
 
@@ -73,6 +71,13 @@
       }
 
       async function getCensus() {
+        if (!server) {
+          throw new Error('no server set');
+        } else if (!server.startsWith('http')) {
+          throw new Error(`server must include protocol. got "${server}"`)
+        } else {
+          console.log('have a server, it is ', server);
+        }
         try {
           let res = await fetch(`${server}/api/census.clients`, {method: 'POST'});
           return res.json();
@@ -118,7 +123,7 @@
 
       document.querySelector('.go').addEventListener('click', submit);
 
-      input.addEventListener('keypress', function (e) {
+      textInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
           submit();
           e.preventDefault();
